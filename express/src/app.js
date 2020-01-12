@@ -13,6 +13,10 @@ app.get("/rn", (req, res) => {
   res.send("<strong>RN SEOUL Image</strong><br /> <img src='/rns.png' />");
 });
 
+app.get("/queryStringTest", (req, res) => {
+  res.send(`${req.query.id}, ${req.query.name}`);
+});
+
 app.get("/dynamic", (req, res) => {
   let lis = "";
   for (let i = 0; i < 5; i++) {
