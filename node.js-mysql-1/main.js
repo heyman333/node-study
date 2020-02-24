@@ -4,7 +4,6 @@ var url = require("url");
 var qs = require("querystring");
 var template = require("./lib/template.js");
 var path = require("path");
-var sanitizeHtml = require("sanitize-html");
 const mysql = require("mysql");
 
 const db = mysql.createConnection({
@@ -71,10 +70,13 @@ var app = http.createServer(function(request, response) {
       });
     }
   } else if (pathname === "/create") {
-    fs.readdir("./data", function(error, filelist) {
-      var title = "WEB - create";
-      var list = template.list(filelist);
-      var html = template.HTML(
+    db.query("SELECT * FROM topic", (err, topics) => {
+      if (err) {
+        throw err;
+      }
+      const title = "WEB - Create";
+      const list = template.list(topics);
+      const html = template.HTML(
         title,
         list,
         `
@@ -88,37 +90,58 @@ var app = http.createServer(function(request, response) {
             </p>
           </form>
         `,
-        ""
+        `<a href="/create">Create</a>`
       );
       response.writeHead(200);
       response.end(html);
     });
   } else if (pathname === "/create_process") {
-    var body = "";
-    request.on("data", function(data) {
-      body = body + data;
+    let body = [];
+    request.on("data", function(chunk) {
+      body.push(chunk);
     });
     request.on("end", function() {
-      var post = qs.parse(body);
-      var title = post.title;
-      var description = post.description;
-      fs.writeFile(`data/${title}`, description, "utf8", function(err) {
-        response.writeHead(302, { Location: `/?id=${title}` });
-        response.end();
-      });
+      body = Buffer.concat(body).toString();
+      const post = qs.parse(body);
+      const title = post.title;
+      const description = post.description;
+
+      db.query(
+        "INSERT INTO topic (title, description, created, author_id) VALUES(?, ?, NOW(), ?)",
+        [title, description, 1],
+        (err, result) => {
+          if (err) {
+            throw err;
+          }
+          response.writeHead(302, { Location: `/?id=${result.insertId}` });
+          response.end();
+        }
+      );
     });
   } else if (pathname === "/update") {
-    fs.readdir("./data", function(error, filelist) {
-      var filteredId = path.parse(queryData.id).base;
-      fs.readFile(`data/${filteredId}`, "utf8", function(err, description) {
-        var title = queryData.id;
-        var list = template.list(filelist);
-        var html = template.HTML(
-          title,
-          list,
-          `
+    db.query("SELECT * FROM topic", (error, topics) => {
+      if (error) {
+        throw error;
+      }
+
+      db.query(
+        "SELECT * FROM topic WHERE id=?",
+        [queryData.id],
+        (error2, topic) => {
+          if (error2) {
+            throw error2;
+          }
+
+          const id = topic[0].id;
+          const title = topic[0].title;
+          const description = topic[0].description;
+          const list = template.list(topics);
+          const html = template.HTML(
+            title,
+            list,
+            `
             <form action="/update_process" method="post">
-              <input type="hidden" name="id" value="${title}">
+              <input type="hidden" name="id" value="${id}">
               <p><input type="text" name="title" placeholder="title" value="${title}"></p>
               <p>
                 <textarea name="description" placeholder="description">${description}</textarea>
@@ -128,11 +151,12 @@ var app = http.createServer(function(request, response) {
               </p>
             </form>
             `,
-          `<a href="/create">create</a> <a href="/update?id=${title}">update</a>`
-        );
-        response.writeHead(200);
-        response.end(html);
-      });
+            `<a href="/create">create</a> <a href="/update?id=${title}">update</a>`
+          );
+          response.writeHead(200);
+          response.end(html);
+        }
+      );
     });
   } else if (pathname === "/update_process") {
     var body = "";
