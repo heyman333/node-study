@@ -1,5 +1,4 @@
 var http = require("http");
-var fs = require("fs");
 var url = require("url");
 var qs = require("querystring");
 var template = require("./lib/template.js");
@@ -41,7 +40,7 @@ var app = http.createServer(function(request, response) {
         }
 
         db.query(
-          `SELECT * FROM topic WHERE id=?`,
+          `SELECT * FROM topic LEFT JOIN author on topic.author_id=author.id WHERE topic.id=?`,
           [queryData.id],
           (err2, topic) => {
             if (err2) {
@@ -51,14 +50,19 @@ var app = http.createServer(function(request, response) {
             const title = topic[0].title;
             const desc = topic[0].description;
             const list = template.list(topics);
+            const id = topic[0].id;
+            const author_name = topic[0].name;
             const html = template.HTML(
               title,
               list,
-              `<h2>${title}</h2>${desc}`,
+              `<h2>${title}</h2>
+              ${desc}
+              <p>by <i>${author_name}</i></p>
+              `,
               `<a href="/create">Create</a>
                 <a href="/update?id=${queryData.id}">Update</a>
                 <form action="delete_process" method="post">
-                  <input type="hidden" name="id" value="${title}">
+                  <input type="hidden" name="id" value="${queryData.id}">
                   <input type="submit" value="Delete">
                 </form>`
             );
@@ -71,29 +75,42 @@ var app = http.createServer(function(request, response) {
     }
   } else if (pathname === "/create") {
     db.query("SELECT * FROM topic", (err, topics) => {
-      if (err) {
-        throw err;
-      }
-      const title = "WEB - Create";
-      const list = template.list(topics);
-      const html = template.HTML(
-        title,
-        list,
-        `
+      db.query("SELECT * FROM author", (err2, authors) => {
+        if (err || err2) {
+          throw err;
+        }
+
+        let author_names = "";
+        authors.map((author, index) => {
+          author_names += `<option value=${authors[index].id}>${author.name}</option>`;
+        });
+
+        const title = "WEB - Create";
+        const list = template.list(topics);
+        const html = template.HTML(
+          title,
+          list,
+          `
           <form action="/create_process" method="post">
             <p><input type="text" name="title" placeholder="title"></p>
             <p>
               <textarea name="description" placeholder="description"></textarea>
+            </p>
+              <select name="author"> 
+                ${author_names}
+              </select>
+            <p>
             </p>
             <p>
               <input type="submit">
             </p>
           </form>
         `,
-        `<a href="/create">Create</a>`
-      );
-      response.writeHead(200);
-      response.end(html);
+          `<a href="/create">Create</a>`
+        );
+        response.writeHead(200);
+        response.end(html);
+      });
     });
   } else if (pathname === "/create_process") {
     let body = [];
@@ -105,10 +122,11 @@ var app = http.createServer(function(request, response) {
       const post = qs.parse(body);
       const title = post.title;
       const description = post.description;
+      const author = post.author;
 
       db.query(
         "INSERT INTO topic (title, description, created, author_id) VALUES(?, ?, NOW(), ?)",
-        [title, description, 1],
+        [title, description, author],
         (err, result) => {
           if (err) {
             throw err;
@@ -187,10 +205,14 @@ var app = http.createServer(function(request, response) {
       body = body + data;
     });
     request.on("end", function() {
-      var post = qs.parse(body);
-      var id = post.id;
-      var filteredId = path.parse(id).base;
-      fs.unlink(`data/${filteredId}`, function(error) {
+      const post = qs.parse(body);
+      console.log("post", post);
+      const id = post.id;
+      db.query("DELETE FROM topic where id=?", [id], err => {
+        if (err) {
+          throw err;
+        }
+
         response.writeHead(302, { Location: `/` });
         response.end();
       });
