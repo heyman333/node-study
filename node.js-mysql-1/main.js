@@ -150,29 +150,49 @@ var app = http.createServer(function(request, response) {
             throw error2;
           }
 
-          const id = topic[0].id;
-          const title = topic[0].title;
-          const description = topic[0].description;
-          const list = template.list(topics);
-          const html = template.HTML(
-            title,
-            list,
-            `
+          db.query("SELECT * FROM author", (error3, authors) => {
+            if (error3) {
+              throw error3;
+            }
+
+            const id = topic[0].id;
+            const title = topic[0].title;
+            const description = topic[0].description;
+            const list = template.list(topics);
+
+            let author_names = "";
+            authors.map((author, index) => {
+              const selected =
+                authors[index].id === topic[0].author_id ? "selected" : "";
+
+              author_names += `<option value=${authors[index].id} ${selected}>${author.name}</option>`;
+            });
+
+            const html = template.HTML(
+              title,
+              list,
+              `
             <form action="/update_process" method="post">
               <input type="hidden" name="id" value="${id}">
               <p><input type="text" name="title" placeholder="title" value="${title}"></p>
               <p>
                 <textarea name="description" placeholder="description">${description}</textarea>
               </p>
+            <p>
+              <select name="author">
+                ${author_names}
+              </select>
+            </p>
               <p>
                 <input type="submit">
               </p>
             </form>
             `,
-            `<a href="/create">create</a> <a href="/update?id=${title}">update</a>`
-          );
-          response.writeHead(200);
-          response.end(html);
+              `<a href="/create">create</a> <a href="/update?id=${title}">update</a>`
+            );
+            response.writeHead(200);
+            response.end(html);
+          });
         }
       );
     });
@@ -186,10 +206,11 @@ var app = http.createServer(function(request, response) {
       const id = post.id;
       const title = post.title;
       const description = post.description;
+      const authorId = post.author;
 
       db.query(
-        "UPDATE topic set title=?, description=?, author_id=1 WHERE id=?",
-        [title, description, id],
+        "UPDATE topic set title=?, description=?, author_id=? WHERE id=?",
+        [title, description, authorId, id],
         error => {
           if (error) {
             throw error;
@@ -206,7 +227,6 @@ var app = http.createServer(function(request, response) {
     });
     request.on("end", function() {
       const post = qs.parse(body);
-      console.log("post", post);
       const id = post.id;
       db.query("DELETE FROM topic where id=?", [id], err => {
         if (err) {
