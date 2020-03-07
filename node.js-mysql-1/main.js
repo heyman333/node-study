@@ -2,16 +2,8 @@ var http = require("http");
 var url = require("url");
 var qs = require("querystring");
 var template = require("./lib/template.js");
-var path = require("path");
-const mysql = require("mysql");
-
-const db = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "1234",
-  database: "opentutorials"
-});
-db.connect();
+const db = require("./lib/db");
+const topic = require("./lib/topic");
 
 var app = http.createServer(function(request, response) {
   var _url = request.url;
@@ -19,20 +11,7 @@ var app = http.createServer(function(request, response) {
   var pathname = url.parse(_url, true).pathname;
   if (pathname === "/") {
     if (queryData.id === undefined) {
-      db.query("SELECT * FROM topic", (err, topics) => {
-        const title = "welcome";
-        const desc = "Hello, Node.js";
-        const list = template.list(topics);
-        const html = template.HTML(
-          title,
-          list,
-          `<h2>${title}</h2>${desc}`,
-          `<a href="/create">Create</a>`
-        );
-
-        response.writeHead(200);
-        response.end(html);
-      });
+      topic.home(request, response);
     } else {
       db.query("SELECT * FROM topic", (err, topics) => {
         if (err) {
