@@ -1,11 +1,13 @@
 const express = require("express");
-const app = express();
+const bodyParser = require("body-parser");
 const user = require("./routes/user");
+const morgan = require("morgan");
 
-app.get("/", (req, res) => {
-  res.send("hello world!");
-});
+const app = express();
 
+app.use("/", express.static("public"));
+app.use(morgan("dev"));
+app.use(bodyParser.json());
 app.use("/user", user);
 
 app.listen(3000, () => {

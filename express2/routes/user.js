@@ -7,7 +7,7 @@ router.get("/:id", (req, res) => {
 });
 
 router.post("/", (req, res) => {
-  res.json({ success: true });
+  res.json({ success: true, name: req.body.name, age: req.body.age });
 });
 
 router.put("/", (req, res) => {
